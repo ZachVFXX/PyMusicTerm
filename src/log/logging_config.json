@@ -50,6 +50,13 @@
       "handlers": [
         "queue_handler"
       ]
+    },
+    "api.discord_rpc.rich_presence": {
+      "level": "ERROR",
+      "handlers": [
+        "queue_handler"
+      ],
+      "propagate": false
     }
   }
 }

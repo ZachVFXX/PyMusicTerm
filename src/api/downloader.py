@@ -139,7 +139,7 @@ class Downloader:
             download_lyrics(
                 video_id=song.video_id,
                 track=song.title,
-                artist=song.artist[0],
+                artist=song.artist[0] if song.artist else "Unknown Artist",
                 album=None,
                 duration=string_to_seconds(song.duration),
             )

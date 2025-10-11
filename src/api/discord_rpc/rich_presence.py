@@ -36,9 +36,12 @@ def format_time(seconds: float) -> str:
 async def rich_presence(player: PyMusicTermPlayer, start: int) -> None:
     """Main function to run the Rich Presence update loop."""
     rpc = None
+    retry_count = 0
+    
     try:
         rpc = AioPresence(CLIENT_ID)
         await rpc.connect()
+        logger.info("Discord Rich Presence connected successfully")
 
         while True:
             try:
@@ -47,6 +50,7 @@ async def rich_presence(player: PyMusicTermPlayer, start: int) -> None:
                     logger.debug("No song is playing")
                     await asyncio.sleep(NO_SONG_SLEEP_INTERVAL)
                     continue
+                    
                 try:
                     artist_name: str = song.get_formatted_artists()
                     song_name: str = song.title
@@ -69,31 +73,48 @@ async def rich_presence(player: PyMusicTermPlayer, start: int) -> None:
                         state=f"Album: {album_name}",
                         start=start,
                     )
+                    
+                    # if succes reset retry count
+                    retry_count = 0
 
                 except KeyError as e:
-                    msg: str = f"Missing key in song data: {e}"
-                    raise RichPresenceError(msg) from e
+                    logger.warning(f"Missing key in song data: {e}")
+                    await asyncio.sleep(UPDATE_INTERVAL)
+                    continue
                 except Exception as e:
-                    msg = f"Failed to update rich presence: {e}"
-                    raise RichPresenceError(msg) from e
+                    logger.warning(f"Failed to update rich presence: {e}")
+                    retry_count += 1
+                    if retry_count >= MAX_RETRIES:
+                        logger.error("Max retries exceeded for Rich Presence updates")
+                        return  # end
+                    await asyncio.sleep(RETRY_DELAY)
+                    continue
 
                 await asyncio.sleep(UPDATE_INTERVAL)
-            except RichPresenceError as e:
-                logger.error(f"Rich Presence Error: {e}")
+                
             except asyncio.CancelledError:
-                with contextlib.suppress(Exception):
-                    await rpc.clear()
-                with contextlib.suppress(Exception):
-                    await rpc.sock_writer.close()
-                raise
+                logger.info("Rich Presence task cancelled")
+                break
             except Exception as e:
-                logger.exception(
-                    f"Unexpected error in update loop: {e}",
-                )
+                logger.warning(f"Unexpected error in Rich Presence update loop: {e}")
+                retry_count += 1
+                if retry_count >= MAX_RETRIES:
+                    logger.error("Too many errors in Rich Presence, stopping")
+                    return
                 await asyncio.sleep(RETRY_DELAY)
+                
     except DiscordNotFound:
-        logger.warning("No discord found")
+        logger.info("Discord not found - Rich Presence disabled")
+        return  # end
     except Exception as e:
-        logger.critical(
-            f"Critical error in Rich Presence main function: {e}",
-        )
+        logger.warning(f"Rich Presence initialization failed: {e}")
+        return  # end
+    finally:
+        # organize process
+        if rpc:
+            try:
+                await rpc.clear()
+                await rpc.close()
+                logger.debug("Rich Presence connection closed")
+            except Exception as e:
+                logger.debug(f"Error closing Rich Presence: {e}")
