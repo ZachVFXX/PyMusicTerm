@@ -151,12 +151,12 @@ class PyMusicTerm(App):
             )
             yield Label("--:--", id="label_song_length", classes="control_label")
         with Horizontal(classes="player_controls"):
-            yield Button("⏮", id="previous")
-            yield Button("▶", id="play_pause")
-            yield Button("⏭", id="next")
+            yield Button("󰼨", id="previous")
+            yield Button("󰐊", id="play_pause")
+            yield Button("󰼧", id="next")
         with Horizontal(classes="player_controls"):
-            yield Button("Shuffle", id="shuffle")
-            yield Button("Loop", id="loop")
+            yield Button("󰒟", id="shuffle")
+            yield Button("󰛤", id="loop")
 
     @on(TabbedContent.TabActivated)
     async def action_select_playlist_tab(
@@ -182,9 +182,9 @@ class PyMusicTerm(App):
         """Update the time label of the player, and update the player."""
         button: Button = self.query_one("#play_pause")
         if self.player.playing:
-            button.label = "⏸"
+            button.label = "󰏤"
         else:
-            button.label = "▶"
+            button.label = "󰐊"
 
         playlist_results: ListView = self.query_one("#playlist_results")
         if self.player.playing:
@@ -355,9 +355,9 @@ class PyMusicTerm(App):
         """Toggle the play button label and start the timer if it's not running."""
         button: Button = self.query_one("#play_pause")
         if self.player.playing:
-            button.label = "⏸"
+            button.label = "󰏤"
         else:
-            button.label = "▶"
+            button.label = "󰐊"
         if self.timer is None:
             self.timer = self.set_interval(
                 0.1,
