@@ -27,7 +27,7 @@ dependencies = [
     "pypresence",
     "lrcup>=0.10.1",
     "dbus-next>=0.2.3",
-    "yt-dlp>=2025.9.26",
+    "yt-dlp>=2025.10.22",
     "textual-serve>=1.1.2",
     "certifi>=2025.8.3",
 ]

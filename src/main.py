@@ -47,26 +47,34 @@ if TYPE_CHECKING:
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class PyMusicTerm(App):
+class PyMusicTerm(App, inherit_bindings=False):
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        ("q", "seek_back", "Seek backward"),
-        ("s", "play", "Play/Pause"),
-        ("space", "play", "Play/Pause"),
-        ("d", "seek_forward", "Seek forward"),
-        ("r", "shuffle", "Shuffle"),
-        ("l", "loop", "Loop at the end"),
-        ("a", "previous", "Previous song"),
-        ("e", "next", "Next song"),
-        ("&", "return_on_search_tab", "Go to the search tab"),
-        ("é", "return_on_playlist_tab", "Go to the playlist tab"),
-        ('"', "return_on_lyrics_tab", "Go to the lyrics tab"),
-        ("j", "volume(-0.01)", "Volume down"),
-        ("k", "volume(0.01)", "Volume up"),
-        ("raise_volume", "volume(0.1)", "Volume up"),
-        ("lower_volume", "volume(-0.1)", "Volume down"),
-        ("mute_volume", "mute", "Mute"),
-        ("m", "mute", "Mute"),
-        ("ctrl+delete", "delete", "Delete the selected song"),
+        Binding("q", "seek_back", "Seek backward"),
+        Binding("s", "play", "Play/Pause"),
+        Binding(
+            "ctrl+c",
+            "app.quit",
+            description="Quit",
+            tooltip="Quit the application.",
+            priority=True,
+            id="quit",
+        ),
+        Binding("space", "play", "Play/Pause"),
+        Binding("d", "seek_forward", "Seek forward"),
+        Binding("r", "shuffle", "Shuffle"),
+        Binding("l", "loop", "Loop at the end"),
+        Binding("a", "previous", "Previous song"),
+        Binding("e", "next", "Next song"),
+        Binding("&", "return_on_search_tab", "Go to the search tab"),
+        Binding("é", "return_on_playlist_tab", "Go to the playlist tab"),
+        Binding('"', "return_on_lyrics_tab", "Go to the lyrics tab"),
+        Binding("j", "volume(-0.01)", "Volume down"),
+        Binding("k", "volume(0.01)", "Volume up"),
+        Binding("raise_volume", "volume(0.1)", "Volume up"),
+        Binding("lower_volume", "volume(-0.1)", "Volume down"),
+        Binding("mute_volume", "mute", "Mute"),
+        Binding("m", "mute", "Mute"),
+        Binding("ctrl+delete", "delete", "Delete the selected song"),
     ]
 
     def __init__(self, setting: SettingManager) -> None:
@@ -233,7 +241,7 @@ class PyMusicTerm(App):
             i = 0
             current_index = 0
             listview: ListView = self.query_one("#lyrics_viewer")
-            for time, lyrics in self.player.lyrics_data:
+            for time, _ in self.player.lyrics_data:
                 if time > current_float:
                     current_index: int = i - 1 if i > 1 else 0
                     break
