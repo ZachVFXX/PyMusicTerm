@@ -202,8 +202,7 @@ class SettingManager:
 
 @dataclass
 class KeyBinding:
-    """All the keybindings of the app."""
-
+    # TODO
     volume_up: str = "k"
     volume_down: str = "j"
     seek_back: str = "q"

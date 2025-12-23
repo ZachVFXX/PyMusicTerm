@@ -11,6 +11,9 @@ from PIL.ImageFile import ImageFile
 from api.protocols import SongData
 
 logger: logging.Logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 @dataclass
@@ -25,21 +28,26 @@ class YTMusic:
         try:
             session = requests.Session()
             session.verify = certifi.where()
-            
+
             # Create SSL context explicitly
-            ssl_context = ssl.create_default_context(cafile=certifi.where())
-            
+            ssl_context: ssl.SSLContext = ssl.create_default_context(
+                cafile=certifi.where(),
+            )
+
             # Create custom adapter with SSL context
             adapter = requests.adapters.HTTPAdapter()
-            session.mount('https://', adapter)
-            
+            session.mount("https://", adapter)
+
             # Initialize YTMusic with custom session
-            self.client = ytmusicapi.YTMusic()
-            self.client._session = session
-            
+            self.client = ytmusicapi.YTMusic(
+                requests_session=session,
+            )
+
             logger.info("YTMusic initialized with custom SSL session")
         except Exception as e:
-            logger.warning(f"Failed to create custom SSL session: {e}, falling back to default")
+            logger.warning(
+                f"Failed to create custom SSL session: {e}, falling back to default",
+            )
             self.client = ytmusicapi.YTMusic()
 
     def search(self, query: str, filter: str = "songs") -> list[SongData]:  # noqa: A002

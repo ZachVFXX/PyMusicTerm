@@ -24,7 +24,7 @@ class PyMusicTermPlayer:
     ) -> None:
         self.media_control: MediaControl = media_control
         self.setting: SettingManager = setting
-        self.music_player = MusicPlayer(self.setting.volume)
+        self.music_player = MusicPlayer(default_volume=self.setting.volume)
         self.ytm = YTMusic()
         self.downloader: Downloader = downloader
         self.list_of_downloaded_songs: list[SongData] = self.get_downloaded_songs()
@@ -77,6 +77,7 @@ class PyMusicTermPlayer:
         self.media_control.populate_playlist()
         self.music_player.load_song(str(path))
         self.music_player.play_song()
+        self.music_player.volume = self.setting.volume
         self.media_control.set_current_song(self.current_song_index)
         self.media_control.on_playback()
 
@@ -85,6 +86,7 @@ class PyMusicTermPlayer:
         self.current_song = self.list_of_downloaded_songs[index]
         self.music_player.load_song(self.list_of_downloaded_songs[index].path)
         self.music_player.play_song()
+        self.music_player.volume = self.setting.volume
         self.media_control.set_current_song(self.current_song_index)
         self.media_control.on_playback()
 
@@ -180,9 +182,15 @@ class PyMusicTermPlayer:
         """Get the current position."""
         return self.music_player.position
 
-    def volume(self, value: float) -> None:
-        """Get the volume up."""
+    def adjust_volume(self, value: float) -> None:
+        """Adjust the volume by a given value."""
         self.music_player.volume += value
+        self.media_control.on_volume()
+        self.setting.volume = self.music_player.volume
+
+    def set_volume(self, value: float) -> None:
+        """Set the volume to a specific value."""
+        self.music_player.volume = value
         self.media_control.on_volume()
         self.setting.volume = self.music_player.volume
 

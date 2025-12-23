@@ -3,11 +3,12 @@
 }
 
 .status_controls {
-    align: center top;
+    align: center middle;
+    height: auto;
 }
 
 .player_controls {
-    align: center top;    
+    align: center top;
     margin: 0;
     padding: 0;
 }
@@ -17,7 +18,6 @@ Rule {
     margin: 0;
     padding: 0;
 }
-
 
 #search_results {
     margin: 0 1;
@@ -37,7 +37,6 @@ Rule {
     text-wrap: nowrap;
     border-bottom: hkey white;
     text-overflow: ellipsis;
-
 }
 
 .title {

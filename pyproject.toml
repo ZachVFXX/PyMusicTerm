@@ -27,9 +27,10 @@ dependencies = [
     "pypresence",
     "lrcup>=0.10.1",
     "dbus-next>=0.2.3",
-    "yt-dlp>=2025.10.22",
+    "yt-dlp>=2025.12.08",
     "textual-serve>=1.1.2",
     "certifi>=2025.8.3",
+    "python-dotenv>=1.2.1",
 ]
 
 [tool.pytest.ini_options]
@@ -51,4 +52,3 @@ dev = [
     "pytest-cov>=6.0.0",
     "textual-dev>=1.7.0",
 ]
-

@@ -68,10 +68,10 @@ class PyMusicTerm(App, inherit_bindings=False):
         Binding("&", "return_on_search_tab", "Go to the search tab"),
         Binding("é", "return_on_playlist_tab", "Go to the playlist tab"),
         Binding('"', "return_on_lyrics_tab", "Go to the lyrics tab"),
-        Binding("j", "volume(-0.01)", "Volume down"),
-        Binding("k", "volume(0.01)", "Volume up"),
-        Binding("raise_volume", "volume(0.1)", "Volume up"),
-        Binding("lower_volume", "volume(-0.1)", "Volume down"),
+        Binding("j", "adjust_volume(-0.01)", "Volume down"),
+        Binding("k", "adjust_volume(0.01)", "Volume up"),
+        Binding("raise_volume", "adjust_volume(0.1)", "Volume up"),
+        Binding("lower_volume", "adjust_volume(-0.1)", "Volume down"),
         Binding("mute_volume", "mute", "Mute"),
         Binding("m", "mute", "Mute"),
         Binding("ctrl+delete", "delete", "Delete the selected song"),
@@ -129,7 +129,7 @@ class PyMusicTerm(App, inherit_bindings=False):
                     yield ListView(id="playlist_results")
             with TabPane("Lyrics", id="lyrics"):  # noqa: SIM117
                 with Vertical():
-                    yield Input(placeholder="Search for a song", id="lyrics_input")
+                    yield Button("󰑐", id="refetch_lyrics")
                     yield ListView(id="lyrics_viewer")
         yield Rule()
         with Vertical(classes="info_controls"):
@@ -350,6 +350,27 @@ class PyMusicTerm(App, inherit_bindings=False):
             if path.exists():
                 await self.load_lyric(listview, path)
 
+    @on(Button.Pressed, "#refetch_lyrics")
+    async def action_refetch_lyrics(self) -> None:
+        listview: ListView = self.query_one("#lyrics_viewer")
+        if not self.player.current_song:
+            await listview.clear()
+            return
+        path: Path = (
+            Path(self.setting.lyrics_dir) / f"{self.player.current_song.video_id}.lrc"
+        )
+
+        song: SongData | None = self.player.current_song
+        download_lyrics(
+            song.video_id,
+            track=song.title,
+            album=song.album,
+            artist=song.artist[0] if song.artist else "Unknown Artist",
+            duration=string_to_seconds(song.duration),
+        )
+        if path.exists():
+            await self.load_lyric(listview, path)
+
     @on(Button.Pressed, "#play_pause")
     async def action_play(self) -> None:
         """Play or pause the song."""
@@ -489,9 +510,9 @@ class PyMusicTerm(App, inherit_bindings=False):
         """Seek forward 10 seconds."""
         self.player.seek(10)
 
-    async def action_volume(self, volume: float) -> None:
+    async def action_adjust_volume(self, volume: float) -> None:
         """Increase the volume."""
-        self.player.volume(volume)
+        self.player.adjust_volume(volume)
         self.notify(
             f"Volume changed to {self.player.music_player.volume:.2f}",
             timeout=0.2,
@@ -500,10 +521,10 @@ class PyMusicTerm(App, inherit_bindings=False):
     async def action_mute(self) -> None:
         """Mute the player."""
         if self.player.music_player.volume == 0:
-            self.player.volume(self.setting.volume)
+            self.player.set_volume(self.setting.volume)
             self.notify("Unmuted", timeout=0.2)
         else:
-            self.player.music_player.volume = 0
+            self.player.set_volume(0)
             self.notify("Muted", timeout=0.2)
 
     async def action_delete(self) -> None:
