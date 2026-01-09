@@ -38,10 +38,7 @@ from setting import SettingManager, rename_console
 if TYPE_CHECKING:
     from textual.widget import Widget
 
-    from player.media_control import (
-        MediaControlMPRIS,
-        MediaControlWin32,
-    )
+from api.media_control.media_control import get_media_control
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -84,23 +81,19 @@ class PyMusicTerm(App, inherit_bindings=False):
 
         self.timer: Widget | None = None
 
-        if self.setting.os == "win32":
-            from player.media_control import MediaControlWin32 as MediaControl  # noqa: I001, PLC0415
-        else:
-            from player.media_control import MediaControlMPRIS as MediaControl  # noqa: I001, PLC0415
         requests_cache.install_cache(
             f"{self.setting.cache_dir}/cache",
             expire_after=timedelta(hours=1),
         )
 
-        self.media_control: MediaControlMPRIS | MediaControlWin32 = MediaControl()
         self.downloader = Downloader(self.setting.music_dir, self.progress_callback)
         self.player = PyMusicTermPlayer(
             self.setting,
-            self.media_control,
             self.downloader,
         )
-        self.media_control.init(self.player)
+        self.media_control = get_media_control(self.setting, self.player)
+        self.player.media_control = self.media_control
+        self.media_control.init()
 
     def compose(self) -> ComposeResult:
         with TabbedContent(classes="search_tabs", id="tabbed_content"):

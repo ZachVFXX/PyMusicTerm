@@ -8,7 +8,7 @@ from api.downloader import Downloader
 from api.music_player import MusicPlayer
 from api.protocols import SongData
 from api.ytmusic import YTMusic
-from player.media_control import MediaControl
+from api.media_control.media_control import MediaControl
 from player.util import format_time
 from setting import SettingManager, fetch_files_from_folder
 
@@ -19,10 +19,9 @@ class PyMusicTermPlayer:
     def __init__(
         self,
         setting: SettingManager,
-        media_control: MediaControl,
         downloader: Downloader,
     ) -> None:
-        self.media_control: MediaControl = media_control
+        self.media_control: MediaControl | None = None
         self.setting: SettingManager = setting
         self.music_player = MusicPlayer(default_volume=self.setting.volume)
         self.ytm = YTMusic()

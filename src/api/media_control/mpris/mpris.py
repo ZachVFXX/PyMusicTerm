@@ -2,9 +2,9 @@ import asyncio
 import logging
 import threading
 
-from dbus_next import BusType, Variant
-from dbus_next.aio import MessageBus
-from dbus_next.service import PropertyAccess, ServiceInterface, dbus_property, method
+from dbus_fast import BusType, Variant
+from dbus_fast.aio import MessageBus
+from dbus_fast.service import PropertyAccess, ServiceInterface, dbus_property, method
 
 from api.protocols import PyMusicTermPlayer
 from api.ytmusic import SongData
@@ -159,7 +159,11 @@ class MPRISPlayerInterface(ServiceInterface):
     @dbus_property(access=PropertyAccess.READ)
     def Metadata(self) -> "a{sv}":
         """Current track metadata"""
-        if not self.adapter.player or not self.adapter.player.list_of_downloaded_songs:
+        if (
+            not self.adapter.player
+            or not self.adapter.player.list_of_downloaded_songs
+            or self.adapter.player.current_song_index is None
+        ):
             return {}
 
         try:
@@ -240,19 +244,31 @@ class MPRISPlayerInterface(ServiceInterface):
 
     @dbus_property()
     def Volume(self) -> "d":
+        if self.adapter.player:
+            return self.adapter.player.music_player.volume
         return self._volume
 
     @Volume.setter
     def set_volume(self, val: "d") -> None:
+        if self.adapter.player:
+            self.adapter.player.set_volume(val)
         self._volume = val
+        self.schedule_update()
 
     @dbus_property()
     def LoopStatus(self) -> "s":
+        if self.adapter.player.music_player.loop_at_end:
+            return "Track"
         return self._loop_status
 
     @LoopStatus.setter
     def set_loop_status(self, val: "s") -> None:
+        if val == "Track":
+            self.adapter.player.music_player.loop_at_end = True
+        else:
+            self.adapter.player.music_player.loop_at_end = False
         self._loop_status = val
+        self.schedule_update()
 
     @dbus_property()
     def Shuffle(self) -> "b":
@@ -261,10 +277,11 @@ class MPRISPlayerInterface(ServiceInterface):
     @Shuffle.setter
     def set_shuffle(self, val: "b") -> None:
         self._shuffle = val
+        self.schedule_update()
 
 
 class DBusAdapter:
-    """Adapter for dbus-next MPRIS implementation"""
+    """Adapter for dbus-fast MPRIS implementation"""
 
     def __init__(self) -> None:
         self.player: PyMusicTermPlayer | None = None
@@ -345,23 +362,37 @@ class DBusAdapter:
 
     def schedule_update(self) -> None:
         """Schedule a property update in the event loop"""
-        if self._loop and self.player_interface:
-            asyncio.run_coroutine_threadsafe(
+        if self._loop and self.player_interface and self._started:
+            future = asyncio.run_coroutine_threadsafe(
                 self._emit_properties_changed(),
                 self._loop,
             )
+            try:
+                future.result(timeout=1)  # Wait for a short time
+            except Exception as e:
+                logger.error(
+                    f"Error scheduling properties changed: {e}",
+                    exc_info=True,
+                )
 
     async def _emit_properties_changed(self) -> None:
-        """Emit properties changed signal"""
+        """Emit properties changed signal for all properties"""
         try:
             if self.player_interface:
-                # Don't wrap in Variant - emit_properties_changed does that automatically
-                changed_properties = {
-                    "PlaybackStatus": self.player_interface.PlaybackStatus,
-                    "Metadata": self.player_interface.Metadata,
-                }
-                self.player_interface.emit_properties_changed(changed_properties)
-                logger.debug("Properties changed signal emitted")
+                # Emit a signal for each property that might have changed
+                props_to_emit = [
+                    "PlaybackStatus",
+                    "Metadata",
+                    "Volume",
+                    "Rate",
+                    "LoopStatus",
+                    "Shuffle",
+                ]
+                for prop_name in props_to_emit:
+                    self.player_interface.emit_properties_changed(
+                        {prop_name: getattr(self.player_interface, prop_name)},
+                    )
+                logger.debug("Properties changed signals emitted for all properties")
         except Exception as e:
             logger.error(f"Error emitting properties changed: {e}", exc_info=True)
 
