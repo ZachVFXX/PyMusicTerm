@@ -3,27 +3,14 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-import music_tag
 import yt_dlp
-from PIL import Image
-
+from mediafile import MediaFile, ImageType,Image
 from api.lyrics import download_lyrics
 from player.util import string_to_seconds
 
 from .ytmusic import SongData
 
 logger: logging.Logger = logging.getLogger(__name__)
-
-
-def image_to_byte(image: Image.Image) -> bytes:
-    # BytesIO is a file-like buffer stored in memory
-    img_byte_arr = io.BytesIO()
-    # image.save expects a file-like as a argument
-    image.save(img_byte_arr, format=image.format)
-    # Turn the BytesIO object back into a bytes object
-    img_byte_arr_bytes: bytes = img_byte_arr.getvalue()
-    return img_byte_arr_bytes
-
 
 class ProgressHook:
     """Progress hook for yt-dlp to track download progress"""
@@ -124,11 +111,11 @@ class Downloader:
 
         # Add metadata tags
         try:
-            file_path = music_tag.load_file(converted_path)
-            file_path["title"] = song.title
-            file_path["artist"] = list(song.artist)
-            file_path["artwork"] = image_to_byte(song.thumbnail)
-            file_path["album"] = song.album
+            file_path = MediaFile(converted_path)
+            file_path.title = song.title
+            file_path.artists = list(song.artist)
+            file_path.images = [Image(data=song.thumbnail, desc="album cover", type=ImageType.front)]
+            file_path.album = song.album
             file_path.save()
         except Exception:
             logger.exception("Failed to add metadata tags")

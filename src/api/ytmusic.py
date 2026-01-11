@@ -11,9 +11,6 @@ from PIL.ImageFile import ImageFile
 from api.protocols import SongData
 
 logger: logging.Logger = logging.getLogger(__name__)
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 @dataclass

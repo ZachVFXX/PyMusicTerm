@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
 from random import shuffle
-
-import music_tag
-
+from mediafile import MediaFile
+from PIL import Image
+from io import BytesIO
 from api.downloader import Downloader
 from api.music_player import MusicPlayer
 from api.protocols import SongData
@@ -36,19 +36,18 @@ class PyMusicTermPlayer:
         songs: list[str | None] = fetch_files_from_folder(self.setting.music_dir, "mp3")
         list_of_songs: list[SongData] = []
         for song in songs:
-            song_metadata = music_tag.load_file(song)
-            artist = song_metadata["artist"]
+            song_metadata = MediaFile(song)
             list_of_songs.append(
                 SongData(
-                    title=str(song_metadata["title"]),
-                    artist=artist.values,
-                    duration=format_time(float(str(song_metadata["#length"]))),
+                    title=str(song_metadata.title),
+                    artist=song_metadata.artist.split(","),
+                    duration=format_time(song_metadata.length),
                     video_id=Path(song).stem,
-                    thumbnail=song_metadata["artwork"].first.thumbnail([128, 128]),
-                    album=str(song_metadata["album"]),
+                    thumbnail=Image.open(BytesIO(song_metadata.images[0].data)),
+                    album=str(song_metadata.album),
                     path=Path(song),
-                ),
-            )
+                    ),
+                )
         return list_of_songs
 
     def query(self, query: str, filter: str) -> list[SongData]:  # noqa: A002
