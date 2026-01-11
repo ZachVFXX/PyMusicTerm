@@ -48,20 +48,6 @@ class YTMusic:
             self.client = ytmusicapi.YTMusic()
 
     def search(self, query: str, filter: str = "songs") -> list[SongData]:  # noqa: A002
-        """
-        Search for a song on YTMusic.
-
-        Args:
-            query (str): The query to search for
-            filter (str, optional): The filter to use. Defaults to "songs".
-
-        Raises:
-            TypeError: If query or filter is not a string
-
-        Returns:
-            list[Song]: The list of songs found
-
-        """
         if not isinstance(query, str):
             msg: str = f"query must be a string, not {type(query)}"
             raise TypeError(msg)

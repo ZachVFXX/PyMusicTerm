@@ -1,3 +1,7 @@
+from textual.widgets._input import InputValidationOn
+from pydantic.v1.errors import InvalidByteSizeUnit
+from textual.timer import Timer
+from textual.binding import BindingType
 import asyncio
 import contextlib
 import logging
@@ -34,6 +38,7 @@ from api.protocols import SongData
 from player.player import PyMusicTermPlayer
 from player.util import format_time, string_to_seconds
 from setting import SettingManager, rename_console
+from enum import StrEnum, auto
 
 if TYPE_CHECKING:
     from textual.widget import Widget
@@ -43,9 +48,39 @@ from api.media_control.media_control import get_media_control
 
 logger: logging.Logger = logging.getLogger(__name__)
 
+class Ids(StrEnum):
+    TABBED_CONTENT = auto()
+
+    SEARCH_TAB = auto()
+    SEARCH_INPUT = auto()
+    SEARCH_FILTER = auto()
+    SEARCH_PROGRESS_BAR = auto()
+    SEARCH_RESULTS = auto()
+
+    PLAYLIST_TAB = auto()
+    PLAYLIST_INPUT = auto()
+    PLAYLIST_RESULTS = auto()
+
+    LYRICS_TAB = auto()
+    LYRICS_REFRESH = auto()
+    LYRICS_VIEWER = auto()
+
+    PLAYER_TITLE = auto()
+    PLAYER_ARTISTS = auto()
+    PLAYER_POSITION = auto()
+    PLAYER_STATUS = auto()
+    PLAYER_DURATION = auto()
+    PLAYER_PREVIOUS = auto()
+    PLAYER_PLAY_PAUSE = auto()
+    PLAYER_NEXT = auto()
+    PLAYER_SHUFFLE = auto()
+    PLAYER_LOOP = auto()
+
+    def to_query(self) -> str:
+            return f"#{self.value}"
 
 class PyMusicTerm(App, inherit_bindings=False):
-    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
+    BINDINGS: ClassVar[list[BindingType]] = [
         Binding("q", "seek_back", "Seek backward"),
         Binding("s", "play", "Play/Pause"),
         Binding(
@@ -79,7 +114,7 @@ class PyMusicTerm(App, inherit_bindings=False):
         self.setting: SettingManager = setting
         rename_console("PyMusicTerm")
 
-        self.timer: Widget | None = None
+        self.timer: Timer | None = None
 
         requests_cache.install_cache(
             f"{self.setting.cache_dir}/cache",
@@ -96,12 +131,12 @@ class PyMusicTerm(App, inherit_bindings=False):
         self.media_control.init()
 
     def compose(self) -> ComposeResult:
-        with TabbedContent(classes="search_tabs", id="tabbed_content"):
-            with TabPane("Search", id="search"):  # noqa: SIM117
+        with TabbedContent(classes="search_tabs", id=Ids.TABBED_CONTENT):
+            with TabPane("Search", id=Ids.SEARCH_TAB):
                 with Vertical():
-                    yield Input(placeholder="Search for a song", id="search_input")
+                    yield Input(placeholder="Search for a song", id=Ids.SEARCH_INPUT)
                     yield Select(
-                        id="search_sort",
+                        id=Ids.SEARCH_FILTER,
                         options=[
                             ("Songs (default: Stream Youtube Music)", "songs"),
                             ("Video (Stream Youtube Video)", "videos"),
@@ -110,54 +145,54 @@ class PyMusicTerm(App, inherit_bindings=False):
                     )
                     yield ProgressBar(
                         100,
-                        id="progress_bar",
+                        id=Ids.SEARCH_PROGRESS_BAR,
                         show_eta=False,
                         show_percentage=False,
                         disabled=True,
                     )
-                    yield ListView(id="search_results")
-            with TabPane("Playlist", id="playlist"):  # noqa: SIM117
+                    yield ListView(id=Ids.SEARCH_RESULTS)
+            with TabPane("Playlist", id=Ids.PLAYLIST_TAB):
                 with Vertical():
-                    yield Input(placeholder="Search for a song", id="playlist_input")
-                    yield ListView(id="playlist_results")
-            with TabPane("Lyrics", id="lyrics"):  # noqa: SIM117
+                    yield Input(placeholder="Search for a song", id=Ids.PLAYLIST_INPUT)
+                    yield ListView(id=Ids.PLAYLIST_RESULTS)
+            with TabPane("Lyrics", id=Ids.LYRICS_TAB):
                 with Vertical():
-                    yield Button("󰑐", id="refetch_lyrics")
-                    yield ListView(id="lyrics_viewer")
+                    yield Button("󰑐", id=Ids.LYRICS_REFRESH)
+                    yield ListView(id=Ids.LYRICS_VIEWER)
         yield Rule()
         with Vertical(classes="info_controls"):
             with Center():
                 yield Label(
                     "Unknown Title",
-                    id="label_current_song_title",
+                    id=Ids.PLAYER_TITLE,
                     markup=False,
                 )
             with Center():
                 yield Label(
                     "Unknown Artist",
-                    id="label_current_song_artist",
+                    id=Ids.PLAYER_ARTISTS,
                     markup=False,
                 )
         with Horizontal(classes="status_controls"):
             yield Label(
                 "--:--",
-                id="label_current_song_position",
+                id=Ids.PLAYER_POSITION,
                 classes="control_label",
             )
             yield ProgressBar(
                 total=100,
                 show_eta=False,
                 show_percentage=False,
-                id="player_status",
+                id=Ids.PLAYER_STATUS,
             )
-            yield Label("--:--", id="label_song_length", classes="control_label")
+            yield Label("--:--", id=Ids.PLAYER_DURATION, classes="control_label")
         with Horizontal(classes="player_controls"):
-            yield Button("󰼨", id="previous")
-            yield Button("󰐊", id="play_pause")
-            yield Button("󰼧", id="next")
+            yield Button("󰼨", id=Ids.PLAYER_PREVIOUS)
+            yield Button("󰐊", id=Ids.PLAYER_PLAY_PAUSE)
+            yield Button("󰼧", id=Ids.PLAYER_NEXT)
         with Horizontal(classes="player_controls"):
-            yield Button("󰒟", id="shuffle")
-            yield Button("󰛤", id="loop")
+            yield Button("󰒟", id=Ids.PLAYER_SHUFFLE)
+            yield Button("󰛤", id=Ids.PLAYER_LOOP)
 
     @on(TabbedContent.TabActivated)
     async def action_select_playlist_tab(
@@ -167,13 +202,13 @@ class PyMusicTerm(App, inherit_bindings=False):
         """
         If the tab is playlist, clear the options and add the songs to the playlist.
         """
-        if event is None or event.tab.id.endswith("playlist"):
+        if event is None or (event.tab.id and event.tab.id.endswith(Ids.PLAYLIST_TAB)):
             await self.redraw_playlist()
 
     async def redraw_playlist(self) -> None:
-        playlist_results: ListView = self.query_one("#playlist_results")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
         children_id: list[str] = [
-            child.id.removeprefix("id-") for child in playlist_results.children
+            child.id.removeprefix("id-") for child in playlist_results.children if child.id
         ]
         for song in self.player.list_of_downloaded_songs:
             if song.video_id not in children_id:
@@ -181,34 +216,35 @@ class PyMusicTerm(App, inherit_bindings=False):
 
     async def update_time(self) -> None:
         """Update the time label of the player, and update the player."""
-        button: Button = self.query_one("#play_pause")
+        button: Button = self.query_one(Ids.PLAYER_PLAY_PAUSE.to_query(), Button)
         if self.player.playing:
             button.label = "󰏤"
         else:
             button.label = "󰐊"
 
-        playlist_results: ListView = self.query_one("#playlist_results")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
         if self.player.playing:
             for i, item in enumerate(playlist_results.children):
-                id_: str = item.id.removeprefix("id-")
-                if id_ == self.player.current_song.video_id:
-                    playlist_results.index = i
+                if item.id:
+                    id_: str = item.id.removeprefix("id-")
+                    if self.player.current_song and (id_ == self.player.current_song.video_id):
+                        playlist_results.index = i  
 
-        progress_bar: ProgressBar = self.query_one("#player_status")
+        progress_bar: ProgressBar = self.query_one(Ids.PLAYER_STATUS.to_query(), ProgressBar)
         label_current_song_position: Label = self.query_one(
-            "#label_current_song_position",
+            Ids.PLAYER_POSITION.to_query(), Label
         )
-        label_song_length: Label = self.query_one("#label_song_length")
+        label_song_length: Label = self.query_one(Ids.PLAYER_DURATION.to_query(), Label)
         length_float: float = self.player.song_length
         current_float: float = self.player.position
         label_current_song_position.update(format_time(current_float))
         label_song_length.update(format_time(length_float))
         if self.player.playing:
             label_current_song_title: Label = self.query_one(
-                "#label_current_song_title",
+                Ids.PLAYER_TITLE.to_query(), Label
             )
             label_current_song_artist: Label = self.query_one(
-                "#label_current_song_artist",
+                Ids.PLAYER_ARTISTS.to_query(), Label
             )
             label_current_song_title.update(
                 self.player.list_of_downloaded_songs[
@@ -233,7 +269,7 @@ class PyMusicTerm(App, inherit_bindings=False):
         if self.player.lyrics_data:
             i = 0
             current_index = 0
-            listview: ListView = self.query_one("#lyrics_viewer")
+            listview: ListView = self.query_one(Ids.LYRICS_VIEWER.to_query(), ListView)
             for time, _ in self.player.lyrics_data:
                 if time > current_float:
                     current_index: int = i - 1 if i > 1 else 0
@@ -248,25 +284,26 @@ class PyMusicTerm(App, inherit_bindings=False):
 
     async def action_return_on_search_tab(self) -> None:
         """Set the search tab as the active tab."""
-        tab: TabbedContent = self.query_one("#tabbed_content")
+        tab: TabbedContent = self.query_one(Ids.TABBED_CONTENT.to_query(), TabbedContent)
         tab.active = "search"
 
     async def action_return_on_playlist_tab(self) -> None:
         """Set the playlist tab as the active tab."""
-        tab: TabbedContent = self.query_one("#tabbed_content")
+        tab: TabbedContent = self.query_one(Ids.TABBED_CONTENT.to_query(), TabbedContent)
         tab.active = "playlist"
 
     async def action_return_on_lyrics_tab(self) -> None:
         """Set the lyrics tab as the active tab."""
-        tab: TabbedContent = self.query_one("#tabbed_content")
+        tab: TabbedContent = self.query_one(Ids.TABBED_CONTENT.to_query(), TabbedContent)
         tab.active = "lyrics"
 
-    @on(ListView.Selected, "#playlist_results")
+    @on(ListView.Selected, Ids.PLAYLIST_RESULTS.to_query())
     async def select_playlist_result(self, event: ListView.Selected) -> None:
         """Select a song from the playlist results and play it."""
-        id_: str = event.item.id.removeprefix("id-")
-        await self.play_from_id(id_)
-        await self.update_lyrics_view()
+        if event.item.id:
+            id_: str = event.item.id.removeprefix("id-")
+            await self.play_from_id(id_)
+            await self.update_lyrics_view()
 
     async def play_from_id(self, ids: str) -> None:
         for i, song in enumerate(self.player.list_of_downloaded_songs):
@@ -274,18 +311,18 @@ class PyMusicTerm(App, inherit_bindings=False):
                 self.player.play_from_list(i)
                 await self.toggle_button()
 
-    @on(ListView.Selected, "#search_results")
+    @on(ListView.Selected, Ids.SEARCH_RESULTS.to_query())
     async def select_result(self, event: ListView.Selected) -> None:
         """Select a song from the search results and play it."""
         video_id: str = str(event.item.id).removeprefix("id-")
-        search_results: ListView = self.query_one("#search_results")
+        search_results: ListView = self.query_one(Ids.SEARCH_RESULTS.to_query(), ListView)
         search_results.disabled = True
-        progress_bar: ProgressBar = self.query_one("#progress_bar")
+        progress_bar: ProgressBar = self.query_one(Ids.SEARCH_PROGRESS_BAR.to_query(), ProgressBar)
         progress_bar.visible = True
         self.download_async(video_id)
 
     def progress_callback(self, downloaded: int, total: int) -> None:
-        progress_bar: ProgressBar = self.query_one("#progress_bar")
+        progress_bar: ProgressBar = self.query_one(Ids.SEARCH_PROGRESS_BAR.to_query(), ProgressBar)
         progress_bar.update(progress=downloaded / total * 100)
 
     @work(thread=True, exclusive=True)
@@ -298,9 +335,9 @@ class PyMusicTerm(App, inherit_bindings=False):
     async def download_and_update(self) -> None:
         await self.toggle_button()
         await self.update_lyrics_view()
-        search_results: ListView = self.query_one("#search_results")
+        search_results: ListView = self.query_one(Ids.SEARCH_RESULTS.to_query(), ListView)
         search_results.disabled = False
-        progress_bar: ProgressBar = self.query_one("#progress_bar")
+        progress_bar: ProgressBar = self.query_one(Ids.SEARCH_PROGRESS_BAR.to_query(), ProgressBar)
         progress_bar.visible = False
 
     async def load_lyric(self, listview: ListView, path: Path) -> None:
@@ -315,14 +352,15 @@ class PyMusicTerm(App, inherit_bindings=False):
                 i += 1  # noqa: SIM113
             self.player.lyrics_data = result
 
-    @on(ListView.Selected, "#lyrics_viewer")
+    @on(ListView.Selected, Ids.LYRICS_VIEWER.to_query())
     async def select_lyrics_viewer(self, event: ListView.Selected) -> None:
-        id_: int = int(event.item.id.removeprefix("id-lyrics-"))
-        time, _ = self.player.lyrics_data[id_]
-        self.player.seek_to(time)
+        if event.item.id and self.player.lyrics_data:
+            id_: int = int(event.item.id.removeprefix("id-lyrics-"))
+            time, _ = self.player.lyrics_data[id_]
+            self.player.seek_to(time)
 
     async def update_lyrics_view(self) -> None:
-        listview: ListView = self.query_one("#lyrics_viewer")
+        listview: ListView = self.query_one(Ids.LYRICS_VIEWER.to_query(), ListView)
         if not self.player.current_song:
             await listview.clear()
             return
@@ -332,28 +370,30 @@ class PyMusicTerm(App, inherit_bindings=False):
         if path.exists():
             await self.load_lyric(listview, path)
         else:
-            song: SongData | None = self.player.current_song
-            download_lyrics(
-                song.video_id,
-                track=song.title,
-                album=song.album,
-                artist=song.artist[0] if song.artist else "Unknown Artist",
-                duration=string_to_seconds(song.duration),
-            )
-            if path.exists():
-                await self.load_lyric(listview, path)
+            if self.player.current_song:
+                song: SongData = self.player.current_song
+                download_lyrics(
+                    song.video_id,
+                    track=song.title,
+                    album=song.album,
+                    artist=song.artist[0] if song.artist else "Unknown Artist",
+                    duration=string_to_seconds(song.duration),
+                )
+                if path.exists():
+                    await self.load_lyric(listview, path)
 
-    @on(Button.Pressed, "#refetch_lyrics")
+    @on(Button.Pressed, Ids.LYRICS_REFRESH.to_query())
     async def action_refetch_lyrics(self) -> None:
-        listview: ListView = self.query_one("#lyrics_viewer")
+        listview: ListView = self.query_one(Ids.LYRICS_VIEWER.to_query(), ListView)
         if not self.player.current_song:
             await listview.clear()
             return
+
         path: Path = (
             Path(self.setting.lyrics_dir) / f"{self.player.current_song.video_id}.lrc"
         )
 
-        song: SongData | None = self.player.current_song
+        song: SongData = self.player.current_song
         download_lyrics(
             song.video_id,
             track=song.title,
@@ -364,7 +404,7 @@ class PyMusicTerm(App, inherit_bindings=False):
         if path.exists():
             await self.load_lyric(listview, path)
 
-    @on(Button.Pressed, "#play_pause")
+    @on(Button.Pressed, Ids.PLAYER_PLAY_PAUSE.to_query())
     async def action_play(self) -> None:
         """Play or pause the song."""
         if self.player.playing:
@@ -375,7 +415,7 @@ class PyMusicTerm(App, inherit_bindings=False):
 
     async def toggle_button(self) -> None:
         """Toggle the play button label and start the timer if it's not running."""
-        button: Button = self.query_one("#play_pause")
+        button: Button = self.query_one(Ids.PLAYER_PLAY_PAUSE.to_query(), Button)
         if self.player.playing:
             button.label = "󰏤"
         else:
@@ -387,46 +427,46 @@ class PyMusicTerm(App, inherit_bindings=False):
                 name="update_time",
             )
 
-    @on(Button.Pressed, "#previous")
+    @on(Button.Pressed, Ids.PLAYER_PREVIOUS.to_query())
     async def action_previous(self) -> None:
         """Play the previous song."""
         await self.toggle_button()
-        playlist_results: ListView = self.query_one("#playlist_results")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
         playlist_results.index = self.player.previous()
         await self.update_lyrics_view()
 
-    @on(Button.Pressed, "#next")
+    @on(Button.Pressed, Ids.PLAYER_NEXT.to_query())
     async def action_next(self) -> None:
         """Play the next song."""
         await self.toggle_button()
-        playlist_results: ListView = self.query_one("#playlist_results")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
         playlist_results.index = self.player.next()
         await self.update_lyrics_view()
 
-    @on(Button.Pressed, "#shuffle")
+    @on(Button.Pressed, Ids.PLAYER_SHUFFLE.to_query())
     async def action_shuffle(self) -> None:
         """Shuffle the list of downloaded songs."""
-        playlist_results: ListView = self.query_one("#playlist_results")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
         await playlist_results.clear()
 
         self.player.suffle()
         await self.action_select_playlist_tab(None)
 
-    @on(Button.Pressed, "#loop")
+    @on(Button.Pressed, Ids.PLAYER_LOOP.to_query())
     async def action_loop(self) -> None:
         """Toggle the loop button."""
-        loop_button: Button = self.query_one("#loop")
+        loop_button: Button = self.query_one(Ids.PLAYER_LOOP.to_query(), Button)
         is_looping: bool = self.player.loop_at_end()
         if is_looping:
             loop_button.variant = "success"
         else:
             loop_button.variant = "default"
 
-    @on(Input.Changed, "#playlist_input")
+    @on(Input.Changed, Ids.PLAYLIST_INPUT.to_query())
     async def search_playlist(self) -> None:
         """Search asynchronously on YTMusic."""
-        playlist_results: ListView = self.query_one("#playlist_results")
-        playlist_input: Input = self.query_one("#playlist_input")
+        playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
+        playlist_input: Input = self.query_one(Ids.PLAYLIST_INPUT.to_query(), Input)
         if playlist_input.value == "":
             await self.action_select_playlist_tab(None)
             return
@@ -438,12 +478,12 @@ class PyMusicTerm(App, inherit_bindings=False):
             ):
                 playlist_results.append(await self._create_song_item(song))
 
-    @on(Input.Submitted, "#search_input")
+    @on(Input.Submitted, Ids.SEARCH_INPUT.to_query())
     def search(self) -> None:
         """Search for a song on YTMusic and display the results."""
-        search_results: ListView = self.query_one("#search_results")
+        search_results: ListView = self.query_one(Ids.SEARCH_RESULTS.to_query(), ListView)
         search_results.clear()
-        search_input: Input = self.query_one("#search_input")
+        search_input: Input = self.query_one(Ids.SEARCH_INPUT.to_query(), Input)
         if search_input.value == "":
             return
         search_results.loading = True
@@ -452,13 +492,13 @@ class PyMusicTerm(App, inherit_bindings=False):
     @work(exclusive=True, thread=True)
     def search_ytb_thread(self, query: str) -> None:
         worker: Worker = get_current_worker()
-        filters: Select = self.query_one("#search_sort")
-        results: list[SongData] = self.player.query(query, filters.value)
+        filters: Select = self.query_one(Ids.SEARCH_FILTER.to_query(), Select)
+        results: list[SongData] = self.player.query(query, str(filters.value))
         if not worker.is_cancelled:
             self.call_from_thread(self.update_search_results, results)
 
     async def update_search_results(self, results: list[SongData]) -> None:
-        search_results: ListView = self.query_one("#search_results")
+        search_results: ListView = self.query_one(Ids.SEARCH_RESULTS.to_query(), ListView)
         search_results.clear()
         for result in results:
             search_results.append(await self._create_song_item(result))
@@ -525,7 +565,7 @@ class PyMusicTerm(App, inherit_bindings=False):
         if self.player.current_song:
             logger.info("Deleting song at index %s", self.player.current_song_index)
             self.player.delete_song(self.player.current_song_index)
-            playlist_results: ListView = self.query_one("#playlist_results")
+            playlist_results: ListView = self.query_one(Ids.PLAYLIST_RESULTS.to_query(), ListView)
             await playlist_results.clear()
             await self.redraw_playlist()
             await self.update_lyrics_view()

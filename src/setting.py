@@ -103,7 +103,6 @@ class SettingManager:
     """Manages the settings of the app."""
 
     def __init__(self) -> None:
-        self._setting = None
         self.check_and_create_paths()
         self._setting: Setting = self.load_setting()
         setup_logging(self.log_dir)
